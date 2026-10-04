@@ -1,14 +1,19 @@
-output "vpc_id" {
-  value       = aws_vpc.main.id
-  description = "The generated reference token identifier of the backbone network VPC"
+variable "vpc_cidr" {
+  type        = string
+  description = "The core CIDR block for the custom production VPC network layout"
 }
 
-output "public_subnet_ids" {
-  value       = aws_subnet.public[*].id
-  description = "List containing the resource IDs of the generated public subnet routing grid"
+variable "environment" {
+  type        = string
+  description = "The target deployment lifecycle stage tier name tag"
 }
 
-output "private_subnet_ids" {
-  value       = aws_subnet.private[*].id
-  description = "List containing the resource IDs of the generated private isolated subnet layout"
+variable "public_subnet_cidrs" {
+  type        = list(string)
+  description = "CIDR block addressing list for multi-AZ public DMZ routing tiers"
+}
+
+variable "private_subnet_cidrs" {
+  type        = list(string)
+  description = "CIDR block addressing list for private secure application workloads"
 }

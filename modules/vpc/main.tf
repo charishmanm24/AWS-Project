@@ -2,15 +2,16 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
-#The Virtual Private Cloud Network
+# The Virtual Private Cloud Network
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
 
   tags = {
-    Name        = "${var.environment}-vpc"
+    Name        = "${var.environment}-custom-vpc"
     Environment = var.environment
+    ManagedBy   = "Terraform"
   }
 }
 
@@ -23,8 +24,9 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name        = "${var.environment}-public-subnet-${count.index + 1}"
+    Name        = "${var.environment}-public-subnet-az-${count.index + 1}"
     Environment = var.environment
+    Tier        = "Public"
   }
 }
 
@@ -36,28 +38,39 @@ resource "aws_subnet" "private" {
   availability_zone = data.aws_availability_zones.available.names[count.index]
 
   tags = {
-    Name        = "${var.environment}-private-subnet-${count.index + 1}"
+    Name        = "${var.environment}-private-subnet-az-${count.index + 1}"
     Environment = var.environment
+    Tier        = "Private"
   }
 }
 
 #Internet Gateway to provide public routing access out of the VPC boundary
+# Internet Gateway
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
-  tags   = { Name = "${var.environment}-igw" }
+
+  tags = {
+    Name        = "${var.environment}-custom-igw"
+    Environment = var.environment
+  }
 }
 
-# Public Route Table mapping traffic directly out to the Internet
+# Public Route Table Configuration
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
+  
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.igw
   }
-  tags = { Name = "${var.environment}-public-rt" }
+
+  tags = {
+    Name        = "${var.environment}-public-route-table"
+    Environment = var.environment
+  }
 }
 
-# Bind Public Subnets to Public Route Table configurations
+# Bind Public Subnets to Public Route Table
 resource "aws_route_table_association" "public" {
   count          = length(var.public_subnet_cidrs)
   subnet_id      = aws_subnet.public[count.index].id
