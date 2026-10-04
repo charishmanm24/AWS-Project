@@ -1,0 +1,17 @@
+# Block local terraform cache and binaries
+.terraform/
+.terraform.lock.hcl
+
+# Block all local state tracking files
+*.tfstate
+*.tfstate.*
+
+# Block runtime crash logs
+crash.log
+*.log
+
+# Block environment variables and secret files
+*.tfvars
+*.tfvars.json
+.env
+.envrc
