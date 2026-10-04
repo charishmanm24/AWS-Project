@@ -32,3 +32,6 @@ jobs:
 
       - name: Terraform Plan Dry-Run Output
         run: terraform plan
+
+      - name: Terraform Live Deployment
+        run: terraform apply -auto-approve
