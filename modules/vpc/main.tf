@@ -1,9 +1,8 @@
-# 1. Fetch active availability zones dynamically within the current region
 data "aws_availability_zones" "available" {
   state = "available"
 }
 
-# 2. The Virtual Private Cloud Network Enclosure
+#The Virtual Private Cloud Network
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
@@ -15,7 +14,7 @@ resource "aws_vpc" "main" {
   }
 }
 
-# 3. Dynamic Multi-AZ Public Subnets (For Load Balancers & Gateways)
+# Public Subnets (For Load Balancers & Gateways)
 resource "aws_subnet" "public" {
   count                   = length(var.public_subnet_cidrs)
   vpc_id                  = aws_vpc.main.id
@@ -29,7 +28,7 @@ resource "aws_subnet" "public" {
   }
 }
 
-# 4. Dynamic Multi-AZ Private Subnets (For Container Workloads & Databases)
+# Private Subnets (For Container Workloads & Databases)
 resource "aws_subnet" "private" {
   count             = length(var.private_subnet_cidrs)
   vpc_id            = aws_vpc.main.id
@@ -42,13 +41,13 @@ resource "aws_subnet" "private" {
   }
 }
 
-# 5. Internet Gateway to provide public routing access out of the VPC boundary
+#Internet Gateway to provide public routing access out of the VPC boundary
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
   tags   = { Name = "${var.environment}-igw" }
 }
 
-# 6. Public Route Table mapping traffic directly out to the Internet
+# Public Route Table mapping traffic directly out to the Internet
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
   route {
@@ -58,7 +57,7 @@ resource "aws_route_table" "public" {
   tags = { Name = "${var.environment}-public-rt" }
 }
 
-# 7. Bind Public Subnets to Public Route Table configurations
+# Bind Public Subnets to Public Route Table configurations
 resource "aws_route_table_association" "public" {
   count          = length(var.public_subnet_cidrs)
   subnet_id      = aws_subnet.public[count.index].id
