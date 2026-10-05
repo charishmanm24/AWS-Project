@@ -7,3 +7,18 @@ module "network_backbone" {
   private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24"]
 }
 
+# Container execution grid cell configuration block
+module "container_compute_tier" {
+  source = "./modules/ecs"
+
+  environment        = var.environment
+  vpc_id             = module.network_backbone.vpc_id
+  public_subnet_ids  = module.network_backbone.public_subnet_ids
+  private_subnet_ids = module.network_backbone.private_subnet_ids
+}
+
+# Output tracking string to display our live website domain address link inside GitHub logs
+output "live_application_endpoint_url" {
+  value       = module.container_compute_tier.load_balancer_url
+  description = "The live public address to visit your enterprise application mesh"
+}
