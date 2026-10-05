@@ -105,16 +105,19 @@ resource "aws_ecs_cluster" "production_container_grid" {
 resource "aws_iam_role" "container_execution_profile" {
   name = "${var.environment}-ecs-execution-iam-role"
 
-  assume_role_policy = jsonencode({
+   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Action    = "sts:AssumeRole"
-      Effect    = "Allow"
-      Principal = { Service = "://amazonaws.com" }
-    }]
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "://amazonaws.com"
+        }
+      }
+    ]
   })
 }
-
 resource "aws_iam_role_policy_attachment" "attach_standard_ecs_policy" {
   role       = aws_iam_role.container_execution_profile.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
