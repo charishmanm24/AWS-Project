@@ -36,6 +36,8 @@ resource "aws_rds_cluster" "aurora_data_backbone" {
   master_password     = "SecureEnterprisePassword2026!" # In production, pull this from AWS Secrets Manager
   skip_final_snapshot = true
 
+   engine_lifecycle_support = "open-source-features-only"
+
   db_subnet_group_name   = var.db_subnet_group_name
   vpc_security_group_ids = [aws_security_group.database_firewall_shield.id]
 
