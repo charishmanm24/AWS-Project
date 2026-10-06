@@ -165,3 +165,76 @@ resource "aws_ecs_service" "orchestrated_runtime_service" {
 
   depends_on = [aws_lb_listener.http_ingress_router]
 }
+
+# ==============================================================================
+# 4. SECURITY TIER (AWS WAFv2 Layer 7 Protection Shield)
+# ==============================================================================
+
+# WAFv2 Web Access Control List (Web ACL)
+resource "aws_wafv2_web_acl" "alb_security_shield" {
+  name        = "${var.environment}-alb-waf-shield"
+  description = "Layer 7 firewall blocking common vulnerabilities and brute-force web vector sets"
+  scope       = "REGIONAL" 
+
+  default_action {
+    allow {} 
+  }
+
+  # Rule 1: AWS Common Vulnerabilities Managed Rule Set (Protects against SQLi, XSS, local file inclusion)
+  rule {
+    name     = "AWS-AWSManagedRulesCommonRuleSet"
+    priority = 1
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesCommonRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.environment}-waf-common-rules-metric"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # Rule 2: IP Rate Limiting Shield (Blocks brute-force vectors and Layer 7 DDoS flooding)
+  rule {
+    name     = "RateLimitShield"
+    priority = 2
+
+    action {
+      block {}
+    }
+
+    statement {
+      rate_based_statement {
+        limit              = 500 # Max requests permitted per rolling 5-minute window per singular source IP
+        aggregate_key_type = "IP"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${var.environment}-waf-rate-limit-metric"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "${var.environment}-waf-global-acl-metric"
+    sampled_requests_enabled   = true
+  }
+}
+
+# Bind the WAFv2 Web ACL directly to your Application Load Balancer
+resource "aws_wafv2_web_acl_association" "waf_alb_binding" {
+  resource_arn = aws_lb.application_routing_hub.arn
+  web_acl_arn  = aws_wafv2_web_acl.alb_security_shield.arn
+}
