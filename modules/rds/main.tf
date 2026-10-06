@@ -1,5 +1,5 @@
 # ==============================================================================
-# DATA LAYER SECURITY 
+# Database Firewall Rules
 # ==============================================================================
 resource "aws_security_group" "database_firewall_shield" {
   name        = "${var.environment}-rds-postgres-sg"
@@ -24,7 +24,7 @@ resource "aws_security_group" "database_firewall_shield" {
 }
 
 # ==============================================================================
-# Standard AWS Free-Tier PostgreSQL Instance
+#Standard AWS Free-Tier PostgreSQL Instance
 # ==============================================================================
 resource "aws_db_instance" "postgres_data_backbone" {
   identifier             = "${var.environment}-enterprise-postgres-db"
