@@ -29,7 +29,7 @@ resource "aws_security_group" "database_firewall_shield" {
 resource "aws_db_instance" "postgres_data_backbone" {
   identifier             = "${var.environment}-enterprise-postgres-db"
   engine                 = "postgres"
-  engine_version         = "15.4"
+  engine_version         = "15.7"
   instance_class         = "db.t3.micro" # 100% Free Tier Eligible compute tier size!
   allocated_storage      = 20            # 100% Free Tier Eligible storage limit bounds (20GB SSD)
   db_name                = "enterprise_app_db"
