@@ -12,10 +12,10 @@ This repository contains an enterprise-grade, highly available, and secure infra
 
 
 
-## 🔒 Production Design Choices Explained
+##  Production Design Choices Explained
 
 ### 1. Zero-Trust Network Isolation
-The active runtime container tasks are deployed strictly within deep **Private Workload Subnets** (`10.0.11.0/24` and `10.0.12.0/24`) with all direct inbound internet routing blocked at the network perimeter. Inbound accessibility is governed via a strict security group mesh: containers only permit entry requests on port 80 if the request explicitly originates from the public-facing Application Load Balancer’s security group token.
+The active runtime container tasks are deployed strictly within **Private Workload Subnets** (`10.0.11.0/24` and `10.0.12.0/24`) with all direct inbound internet routing blocked at the network perimeter. Inbound accessibility is governed via a strict security group mesh: containers only permit entry requests on port 80 if the request explicitly originates from the public-facing Application Load Balancer’s security group token.
 
 ### 2. High Availability & Automated Self-Healing
 Workload cells are systematically distributed across independent AWS Availability Zones (`ap-south-1a` and `ap-south-1b`). Backed by an ECS Service engine configuration tracking an active `desired_count = 2`, the cloud platform automatically monitors node health via target group pings. If an entire zone location suffers an infrastructure failure, the manager marks the affected cell anomalous and seamlessly shifts load traffic to the healthy zone while spinning up an identical replacement instance in seconds.

@@ -121,3 +121,26 @@ resource "aws_route_table_association" "private" {
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private.id
 }
+
+# Isolated Multi-AZ Database Subnets 
+resource "aws_subnet" "database_isolated_tier" {
+  count             = 2
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = ["10.0.21.0/24", "10.0.22.0/24"][count.index]
+  availability_zone = data.aws_availability_zones.available.names[count.index]
+
+  tags = {
+    Name        = "${var.environment}-database-subnet-az-${count.index + 1}"
+    Environment = var.environment
+    Tier        = "Database"
+  }
+}
+
+# DB Subnet required by Amazon Aurora
+resource "aws_db_subnet_group" "aurora_subnet_cluster_group" {
+  name        = "${var.environment}-aurora-subnet-group"
+  description = "Binds target isolated subnets across multiple availability zones for data access layers"
+  subnet_ids  = aws_subnet.database_isolated_tier[*].id
+
+  tags = { Name = "${var.environment}-aurora-subnet-group" }
+}
