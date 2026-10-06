@@ -9,3 +9,9 @@ variable "environment" {
   default     = "prod"
   description = "Deployment track tag naming convention"
 }
+
+variable "db_password" {
+  type        = string
+  sensitive   = true
+  description = "The database master password passed dynamically"
+}

@@ -17,3 +17,9 @@ variable "ecs_tasks_security_group_id" {
   type        = string
   description = "The security group identifier of the application containers requesting data connectivity"
 }
+
+variable "db_password" {
+  type        = string
+  sensitive   = true # ◄── Crucial! Tells Terraform to hide this password in all console logs
+  description = "The root master password for the PostgreSQL database instance"
+}
