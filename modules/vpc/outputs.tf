@@ -12,3 +12,8 @@ output "private_subnet_ids" {
   value       = aws_subnet.private[*].id
   description = "List containing the resource IDs of the generated private isolated subnet layout"
 }
+
+output "db_subnet_group_name" {
+  value       = aws_db_subnet_group.aurora_subnet_cluster_group.name
+  description = "The database subnet group identifier exported to anchor the RDS database tier"
+}
