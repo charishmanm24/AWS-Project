@@ -22,3 +22,14 @@ output "live_application_endpoint_url" {
   value       = module.container_compute_tier.load_balancer_url
   description = "The live public address to visit your enterprise application mesh"
 }
+
+
+# DATABASE TIER MODULE (Amazon Aurora Serverless v2)
+module "database_storage_tier" {
+  source = "./modules/rds"
+
+  environment                 = var.environment
+  vpc_id                      = module.network_backbone.vpc_id
+  db_subnet_group_name        = module.network_backbone.db_subnet_group_name
+  ecs_tasks_security_group_id = module.container_compute_tier.ecs_tasks_security_group_id
+}
