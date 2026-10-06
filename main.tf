@@ -32,6 +32,6 @@ module "database_storage_tier" {
   vpc_id                      = module.network_backbone.vpc_id
   db_subnet_group_name        = module.network_backbone.db_subnet_group_name
   ecs_tasks_security_group_id = module.container_compute_tier.ecs_tasks_security_group_id
-  db_password = var.db_password
+  db_password                 = var.db_password
 }
 

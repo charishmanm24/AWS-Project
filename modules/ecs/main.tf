@@ -97,7 +97,6 @@ resource "aws_lb_listener" "http_ingress_router" {
 # Core Orchestration Cluster
 resource "aws_ecs_cluster" "production_container_grid" {
   name = "${var.environment}-ecs-orchestration-cluster"
-  
   tags = { Name = "${var.environment}-ecs-cluster" }
 }
 
@@ -151,7 +150,7 @@ resource "aws_ecs_task_definition" "web_application_blueprint" {
       containerPort = 80
       hostPort      = 80
     }]
-    
+
     logConfiguration = {
       logDriver = "awslogs"
       options = {
@@ -201,10 +200,10 @@ resource "aws_ecs_service" "orchestrated_runtime_service" {
 resource "aws_wafv2_web_acl" "alb_security_shield" {
   name        = "${var.environment}-alb-waf-shield"
   description = "Layer 7 firewall blocking common vulnerabilities and brute-force web vector sets"
-  scope       = "REGIONAL" 
+  scope       = "REGIONAL"
 
   default_action {
-    allow {} 
+    allow {}
   }
 
   # Rule 1: AWS Common Vulnerabilities Managed Rule Set (Protects against SQLi, XSS, local file inclusion)

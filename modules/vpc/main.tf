@@ -58,7 +58,7 @@ resource "aws_internet_gateway" "igw" {
 # Public Route Table Configuration
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
-  
+
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.igw.id
@@ -82,7 +82,7 @@ resource "aws_route_table_association" "public" {
 resource "aws_eip" "nat_eip" {
   domain     = "vpc"
   depends_on = [aws_internet_gateway.igw]
-  
+
   tags = {
     Name        = "${var.environment}-nat-eip"
     Environment = var.environment
