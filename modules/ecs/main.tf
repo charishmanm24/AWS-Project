@@ -123,25 +123,52 @@ resource "aws_iam_role_policy_attachment" "attach_standard_ecs_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Container Blueprint Specification Template
+# Centralized Monitoring for Serverless Logs
+resource "aws_cloudwatch_log_group" "container_monitoring_logs" {
+  name              = "/ecs/${var.environment}-web-application"
+  retention_in_days = 7 # Automatically purges old log traces to optimize cloud costs
+
+  tags = {
+    Name        = "${var.environment}-ecs-log-group"
+    Environment = var.environment
+  }
+}
+
+# Task Definition with Integrated Logging Agent
 resource "aws_ecs_task_definition" "web_application_blueprint" {
   family                   = "${var.environment}-web-app-task"
-  network_mode             = "awsvpc" # Mandatory networking topology allocation mode for AWS Fargate
+  network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = "256"    # Standard micro allocations (0.25 vCPU cores)
-  memory                   = "512"    # Standard micro allocations (512 MB RAM)
+  cpu                      = "256"
+  memory                   = "512"
   execution_role_arn       = aws_iam_role.container_execution_profile.arn
 
   container_definitions = jsonencode([{
     name      = "web-service-cell"
-    image     = "nginx:alpine" # High performance micro Linux web architecture image layout
+    image     = "nginx:alpine"
     essential = true
     portMappings = [{
       containerPort = 80
       hostPort      = 80
     }]
+    
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.container_monitoring_logs.name
+        "awslogs-region"        = "ap-south-1"
+        "awslogs-stream-prefix" = "fargate-worker"
+      }
+    }
   }])
 }
+
+# Grants Fargate the ability to stream runtime logs directly out to the CloudWatch API
+resource "aws_iam_role_policy_attachment" "attach_cloudwatch_logging_policy" {
+  role       = aws_iam_role.container_execution_profile.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
+}
+
 
 # Continuous Active Service Engine Manager
 resource "aws_ecs_service" "orchestrated_runtime_service" {
