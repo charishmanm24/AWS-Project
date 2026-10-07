@@ -1,5 +1,5 @@
 # ==============================================================================
-# Database Firewall Rules
+# Isolated Database Firewall Rules
 # ==============================================================================
 resource "aws_security_group" "database_firewall_shield" {
   name        = "${var.environment}-rds-postgres-sg"

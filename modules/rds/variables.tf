@@ -1,11 +1,11 @@
 variable "environment" {
   type        = string
-  description = "The target deployment lifecycle stage tier name tag"
+  description = "The target deployment lifecycle stage name tag"
 }
 
 variable "vpc_id" {
   type        = string
-  description = "The reference ID string of our custom backbone network VPC"
+  description = "The reference ID string of the custom network VPC"
 }
 
 variable "db_subnet_group_name" {
