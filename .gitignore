@@ -10,8 +10,10 @@
 crash.log
 *.log
 
-# Block environment variables and secret files
+# Local Variables Override Arrays
 *.tfvars
 *.tfvars.json
+
+# Environment Secrets Profiles
 .env
-.envrc
+.env.*
