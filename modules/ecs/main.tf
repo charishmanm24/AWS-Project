@@ -123,7 +123,7 @@ resource "aws_cloudwatch_log_group" "container_monitoring_logs" {
   }
 }
 
-# Run Nginx on Fargate and send logs to CloudWatch.
+# Run Nginx on Fargate and send the logs to CloudWatch.
 resource "aws_ecs_task_definition" "web_application_blueprint" {
   family                   = "${var.environment}-web-app-task"
   network_mode             = "awsvpc"
