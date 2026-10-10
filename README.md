@@ -16,15 +16,17 @@ Provide the database password through `TF_VAR_db_password` using a secure local 
 
 ## Architecture
 
-## Architecture
-
 ```mermaid
 flowchart TD
-    Internet([Global Internet]) --> WAF
+    Internet([Global Internet]) --> WAF["AWS WAFv2 Web ACL (Edge Shield)"]
+    WAF --> IGW["Internet Gateway (IGW)"]
     
-    subgraph VPC [Custom VPC: 10.0.0.0/16]
+    subgraph VPC [Custom VPC Boundary: 10.0.0.0/16]
+        IGW <--> ALB
+        NAT --> IGW
+        
         subgraph DMZ [Public DMZ Subnets]
-            WAF["AWS WAFv2 Web ACL"] --> ALB["Public ALB (HTTP :80)"]
+            ALB["Public ALB (HTTP :80)"]
             NAT["Single NAT Gateway"]
         end
 
@@ -36,10 +38,8 @@ flowchart TD
             ECS --> DB["RDS PostgreSQL (db.t3.micro)"]
         end
     end
-
-    ECS --> NAT
-    NAT --> Internet
 ```
+
 
 
 The VPC module defines public and private subnets from the CIDR lists in the root `main.tf`. It also creates two database subnets using `10.0.21.0/24` and `10.0.22.0/24`. Subnets are assigned to the first available AZs returned by AWS in the configured region; the AZ names are not hard-coded.
