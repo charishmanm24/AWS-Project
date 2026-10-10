@@ -19,11 +19,11 @@ Provide the database password through `TF_VAR_db_password` using a secure local 
 
 ```mermaid
 flowchart TD
-    %% External Entities and Regional Protection Layers
+    %% External Entities and Associated Control Planes
     Internet([Global Internet])
     WAF["AWS WAFv2 Web ACL\n(Associated with ALB)"]
 
-    %% Custom Virtual Private Cloud Boundary
+    %% Custom Virtual Private Cloud Matrix Boundary
     subgraph VPC [Custom VPC Boundary: 10.0.0.0/16]
         IGW["Internet Gateway (IGW)"]
         
@@ -32,28 +32,27 @@ flowchart TD
             NAT["Single NAT Gateway"]
         end
 
-        subgraph Private [Private App Subnets]
-            ECS["ECS Fargate Service (2 Tasks)"]
+        subgraph Private [Private Subnets - Compute Tier]
+            ECS["ECS Fargate Tasks\n(nginx:alpine containers\nwith public IP interfaces allocated)"]
         end
 
-        subgraph Data [Isolated Data Subnets]
+        subgraph Data [Isolated Database Subnets]
             DB["RDS PostgreSQL (db.t3.micro)"]
         end
     end
 
     %% Inbound Traffic Flow (Stateful Ingress Paths)
-    Internet ===>|1. User Request| IGW
-    IGW ===>|2. Forward Ingress| ALB
-    WAF -.-|Inline Policy Inspection| ALB
-    ALB ===>|3. Proxied Reverse Proxy| ECS
-    ECS ===>|4. Database Queries| DB
+    Internet ===>|1. Inbound Request| IGW
+    IGW ===>|2. Route to Public Subnet| ALB
+    WAF -.-|Inline Policy Inspection & Rate-Limiting| ALB
+    ALB ===>|3. Forward HTTP Traffic| ECS
+    ECS ===>|4. Allow Port 5432 Ingress Only| DB
 
     %% Outbound Traffic Flow (Stateful Egress Paths)
-    ECS -.->|A. Outbound Image Pull / Egress| NAT
-    NAT -.->|B. Route to IGW| IGW
+    ECS -.->|A. Outbound Egress Traffic| NAT
+    NAT -.->|B. Route Outbound via Shared Route Table| IGW
     IGW -.->|C. Exit Network| Internet
 ```
-
 
 
 
