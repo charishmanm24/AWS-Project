@@ -19,39 +19,35 @@ Provide the database password through `TF_VAR_db_password` using a secure local 
 
 ```mermaid
 flowchart TD
-    %% External Entities and Associated Control Planes
     Internet([Global Internet])
-    WAF["AWS WAFv2 Web ACL\n(Associated with ALB)"]
+    WAF["AWS WAFv2 Web ACL"]
 
-    %% Custom Virtual Private Cloud Matrix Boundary
-    subgraph VPC [Custom VPC Boundary: 10.0.0.0/16]
-        IGW["Internet Gateway (IGW)"]
-        
-        subgraph DMZ [Public DMZ Subnets]
-            ALB["Public ALB (HTTP :80)"]
+    subgraph VPC["Custom VPC: 10.0.0.0/16"]
+        IGW["Internet Gateway"]
+
+        subgraph Public["Public Subnets"]
+            ALB["Public ALB<br/>HTTP :80"]
             NAT["Single NAT Gateway"]
         end
 
-        subgraph Private [Private Subnets - Compute Tier]
-            ECS["ECS Fargate Tasks\n(nginx:alpine containers\nwith public IP interfaces allocated)"]
+        subgraph Private["Private App Subnets"]
+            ECS["ECS Fargate Service<br/>2 nginx:alpine tasks<br/>Public IP assignment enabled"]
         end
 
-        subgraph Data [Isolated Database Subnets]
-            DB["RDS PostgreSQL (db.t3.micro)"]
+        subgraph Data["Isolated Database Subnets"]
+            DB["RDS PostgreSQL<br/>db.t3.micro"]
         end
     end
 
-    %% Inbound Traffic Flow (Stateful Ingress Paths)
-    Internet ===>|1. Inbound Request| IGW
-    IGW ===>|2. Route to Public Subnet| ALB
-    WAF -.-|Inline Policy Inspection & Rate-Limiting| ALB
-    ALB ===>|3. Forward HTTP Traffic| ECS
-    ECS ===>|4. Allow Port 5432 Ingress Only| DB
+    Internet -->|Inbound and response traffic| IGW
+    IGW -->|Public subnet route| ALB
+    WAF -.->|Associated with ALB; inspects requests| ALB
+    ALB -->|Forwards HTTP traffic| ECS
+    ECS -->|TCP 5432 permitted by security group| DB
 
-    %% Outbound Traffic Flow (Stateful Egress Paths)
-    ECS -.->|A. Outbound Egress Traffic| NAT
-    NAT -.->|B. Route Outbound via Shared Route Table| IGW
-    IGW -.->|C. Exit Network| Internet
+    ECS -.->|Outbound traffic; private subnet route| NAT
+    NAT -.->|Public subnet route| IGW
+    IGW -.->|Internet access| Internet
 ```
 
 
