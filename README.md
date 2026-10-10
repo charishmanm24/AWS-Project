@@ -20,11 +20,11 @@ Provide the database password through `TF_VAR_db_password` using a secure local 
 
 ```mermaid
 flowchart TB
-    InternetIn([Global Internet])
-    WAF["AWS WAFv2 Web ACL<br/>Associated with ALB"]
+    Internet([Global Internet])
+    WAF["AWS WAFv2 Web ACL"]
 
     subgraph VPC["Custom VPC: 10.0.0.0/16"]
-        IGWIn["Internet Gateway"]
+        IGW["Internet Gateway<br/>Attached to VPC"]
 
         subgraph Public["Public Subnets"]
             ALB["Public ALB<br/>HTTP port 80"]
@@ -38,21 +38,15 @@ flowchart TB
         subgraph Data["Isolated Database Subnets"]
             DB["RDS PostgreSQL<br/>db.t3.micro"]
         end
-
-        IGWOut["Internet Gateway<br/>(same gateway shown above)"]
     end
 
-    InternetOut([Global Internet])
-
-    InternetIn -->|Inbound| IGWIn
-    IGWIn -->|Public subnet route| ALB
-    WAF -.->|Associated with; inspects requests for| ALB
+    Internet <-->|Internet connectivity| IGW
+    IGW -->|Public route| ALB
+    WAF -.->|Associated with ALB; inspects requests| ALB
     ALB -->|Forwards HTTP traffic| ECS
-    ECS -->|TCP 5432 allowed by security group| DB
-
-    ECS -.->|Private subnet default route via NAT| NAT
-    NAT -.->|Public subnet route| IGWOut
-    IGWOut -.->|Internet access| InternetOut
+    ECS -.->|Security group permits TCP 5432| DB
+    ECS -.->|Private subnet default route| NAT
+    NAT -.->|Public subnet route| IGW
 ```
 
 
