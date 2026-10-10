@@ -20,10 +20,11 @@ Provide the database password through `TF_VAR_db_password` using a secure local 
 
 ```mermaid
 flowchart TB
-    Internet([Global Internet])
+    InternetIn([Global Internet])
+    WAF["AWS WAFv2 Web ACL<br/>Associated with ALB"]
 
     subgraph VPC["Custom VPC: 10.0.0.0/16"]
-        IGW["Internet Gateway"]
+        IGWIn["Internet Gateway"]
 
         subgraph Public["Public Subnets"]
             ALB["Public ALB<br/>HTTP port 80"]
@@ -31,24 +32,28 @@ flowchart TB
         end
 
         subgraph Private["Private App Subnets"]
-            ECS["ECS Fargate<br/>2 nginx:alpine tasks<br/>assign_public_ip = true"]
+            ECS["ECS Fargate Service<br/>2 nginx:alpine tasks<br/>assign_public_ip = true"]
         end
 
         subgraph Data["Isolated Database Subnets"]
             DB["RDS PostgreSQL<br/>db.t3.micro"]
         end
+
+        IGWOut["Internet Gateway<br/>(same gateway shown above)"]
     end
 
-    Egress["Egress route from private subnets:<br/>0.0.0.0/0 via NAT Gateway, then IGW"]
+    InternetOut([Global Internet])
 
-    Internet -->|Inbound| IGW
-    IGW -->|Public route| ALB
-    WAF["AWS WAFv2 Web ACL"] -.->|Associated with ALB| ALB
-    ALB -->|HTTP| ECS
-    ECS -->|TCP port 5432| DB
-    ECS -.->|Outbound route details| Egress
+    InternetIn -->|Inbound| IGWIn
+    IGWIn -->|Public subnet route| ALB
+    WAF -.->|Associated with; inspects requests for| ALB
+    ALB -->|Forwards HTTP traffic| ECS
+    ECS -->|TCP 5432 allowed by security group| DB
+
+    ECS -.->|Private subnet default route via NAT| NAT
+    NAT -.->|Public subnet route| IGWOut
+    IGWOut -.->|Internet access| InternetOut
 ```
-
 
 
 
