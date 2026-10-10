@@ -16,7 +16,7 @@ Provide the database password through `TF_VAR_db_password` using a secure local 
 
 
 ## Architecture
-
+     
 ```mermaid
 flowchart TD
     Internet([Global Internet])
@@ -49,6 +49,8 @@ flowchart TD
     NAT -.->|Public subnet route| IGW
     IGW -.->|Internet access| Internet
 ```
+
+The ECS tasks are configured in private subnets with public IP assignment enabled. The diagram calls out that setting, while showing outbound traffic routed through the NAT Gateway as configured. **No repository files were changed.**
 
 
 
