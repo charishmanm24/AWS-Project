@@ -17,38 +17,36 @@ Provide the database password through `TF_VAR_db_password` using a secure local 
 
 ## Architecture
      
-
 ```mermaid
 flowchart TB
     Internet([Global Internet])
     WAF["AWS WAFv2 Web ACL"]
 
     subgraph VPC["Custom VPC: 10.0.0.0/16"]
-        IGW["Internet Gateway<br/>Attached to VPC"]
+        IGW["Internet Gateway"]
 
-        subgraph Public["Public Subnets"]
+        subgraph Public["Public Subnets<br/>10.0.1.0/24 and 10.0.2.0/24"]
             ALB["Public ALB<br/>HTTP port 80"]
-            NAT["Single NAT Gateway"]
+            NAT["Single NAT Gateway<br/>with Elastic IP"]
         end
 
-        subgraph Private["Private App Subnets"]
-            ECS["ECS Fargate Service<br/>2 nginx:alpine tasks<br/>assign_public_ip = true"]
+        subgraph Private["Private App Subnets<br/>10.0.11.0/24 and 10.0.12.0/24"]
+            ECS["ECS Fargate Service<br/>2 nginx:alpine tasks<br/>No public IP"]
         end
 
-        subgraph Data["Isolated Database Subnets"]
+        subgraph Data["Isolated Database Subnets<br/>10.0.21.0/24 and 10.0.22.0/24"]
             DB["RDS PostgreSQL<br/>db.t3.micro"]
         end
     end
 
-    Internet <-->|Internet connectivity| IGW
-    IGW -->|Public route| ALB
-    WAF -.->|Associated with ALB; inspects requests| ALB
+    Internet <-->|Inbound and response traffic| IGW
+    IGW -->|Public subnet route| ALB
+    WAF -.->|Associated with ALB| ALB
     ALB -->|Forwards HTTP traffic| ECS
     ECS -.->|Security group permits TCP 5432| DB
     ECS -.->|Private subnet default route| NAT
     NAT -.->|Public subnet route| IGW
 ```
-
 
 
 The VPC module defines public and private subnets from the CIDR lists in the root `main.tf`. It also creates two database subnets using `10.0.21.0/24` and `10.0.22.0/24`. Subnets are assigned to the first available AZs returned by AWS in the configured region; the AZ names are not hard-coded.

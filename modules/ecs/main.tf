@@ -152,11 +152,6 @@ resource "aws_ecs_task_definition" "web_application_blueprint" {
   }])
 }
 
-resource "aws_iam_role_policy_attachment" "attach_cloudwatch_logging_policy" {
-  role       = aws_iam_role.container_execution_profile.name
-  policy_arn = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
-}
-
 
 resource "aws_ecs_service" "orchestrated_runtime_service" {
   name            = "${var.environment}-core-microservice"
@@ -168,7 +163,7 @@ resource "aws_ecs_service" "orchestrated_runtime_service" {
   network_configuration {
     subnets          = var.private_subnet_ids
     security_groups  = [aws_security_group.container_workload_isolation.id]
-    assign_public_ip = true
+    assign_public_ip = false
   }
 
   load_balancer {
