@@ -16,6 +16,7 @@ Provide the database password through `TF_VAR_db_password` using a secure local 
 
 ## Architecture
 
+## Architecture
 
 ```mermaid
 flowchart TD
@@ -36,9 +37,10 @@ flowchart TD
         end
     end
 
-    ECS -->|Outbound Image Pull| NAT
-    NAT -->│Egress│ Internet
+    ECS --> NAT
+    NAT --> Internet
 ```
+
 
 The VPC module defines public and private subnets from the CIDR lists in the root `main.tf`. It also creates two database subnets using `10.0.21.0/24` and `10.0.22.0/24`. Subnets are assigned to the first available AZs returned by AWS in the configured region; the AZ names are not hard-coded.
 
