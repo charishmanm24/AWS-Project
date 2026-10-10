@@ -19,20 +19,19 @@ Provide the database password through `TF_VAR_db_password` using a secure local 
      
 
 ```mermaid
-flowchart TD
+flowchart TB
     Internet([Global Internet])
-    WAF["AWS WAFv2 Web ACL"]
 
     subgraph VPC["Custom VPC: 10.0.0.0/16"]
         IGW["Internet Gateway"]
 
         subgraph Public["Public Subnets"]
-            ALB["Public ALB<br/>HTTP :80"]
+            ALB["Public ALB<br/>HTTP port 80"]
             NAT["Single NAT Gateway"]
         end
 
         subgraph Private["Private App Subnets"]
-            ECS["ECS Fargate Service<br/>2 nginx:alpine tasks<br/>Public IP assignment enabled"]
+            ECS["ECS Fargate<br/>2 nginx:alpine tasks<br/>assign_public_ip = true"]
         end
 
         subgraph Data["Isolated Database Subnets"]
@@ -40,20 +39,16 @@ flowchart TD
         end
     end
 
-    Internet -->|Inbound and response traffic| IGW
-    IGW -->|Public subnet route| ALB
-    WAF -.->|Associated with ALB; inspects requests| ALB
-    ALB -->|Forwards HTTP traffic| ECS
-    ECS -->|TCP 5432 permitted by security group| DB
+    Egress["Egress route from private subnets:<br/>0.0.0.0/0 via NAT Gateway, then IGW"]
 
-    ECS -.->|Outbound traffic; private subnet route| NAT
-    NAT -.->|Public subnet route| IGW
-    IGW -.->|Internet access| Internet
+    Internet -->|Inbound| IGW
+    IGW -->|Public route| ALB
+    WAF["AWS WAFv2 Web ACL"] -.->|Associated with ALB| ALB
+    ALB -->|HTTP| ECS
+    ECS -->|TCP port 5432| DB
+    ECS -.->|Outbound route details| Egress
 ```
 
-The ECS tasks are configured in private subnets with public IP assignment enabled. The diagram calls out that setting, while showing outbound traffic routed through the NAT Gateway as configured. **No repository files were changed.**
-
-The ECS tasks are configured in private subnets with public IP assignment enabled. The diagram calls out that setting, while showing outbound traffic routed through the NAT Gateway as configured. **No repository files were changed.**
 
 
 
