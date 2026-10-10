@@ -1,6 +1,4 @@
-# ==============================================================================
-# 1. SECURITY TIER (Firewalls & Zero Trust Network Isolation)
-# ==============================================================================
+# SECURITY TIER (Firewalls)
 
 # Public Web Facing Load Balancer Security Group
 resource "aws_security_group" "load_balancer_security_edge" {
@@ -48,10 +46,8 @@ resource "aws_security_group" "container_workload_isolation" {
   tags = { Name = "${var.environment}-ecs-tasks-security-group" }
 }
 
-# ==============================================================================
-# 2. ROUTING TIER (High Availability Application Load Balancer)
-# ==============================================================================
 
+# ROUTING TIER (High Availability Application Load Balancer)
 resource "aws_lb" "application_routing_hub" {
   name               = "${var.environment}-app-load-balancer"
   internal           = false
@@ -192,9 +188,8 @@ resource "aws_ecs_service" "orchestrated_runtime_service" {
   depends_on = [aws_lb_listener.http_ingress_router]
 }
 
-# ==============================================================================
-# 4. SECURITY TIER (AWS WAFv2 Layer 7 Protection Shield)
-# ==============================================================================
+
+# SECURITY TIER (AWS WAFv2 Layer 7 Protection Shield)
 
 # WAFv2 Web Access Control List (Web ACL)
 resource "aws_wafv2_web_acl" "alb_security_shield" {

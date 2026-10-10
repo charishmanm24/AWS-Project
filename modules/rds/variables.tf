@@ -20,6 +20,6 @@ variable "ecs_tasks_security_group_id" {
 
 variable "db_password" {
   type        = string
-  sensitive   = true # <-- Crucial! Tells Terraform to hide this password in all console logs
+  sensitive   = true # <-- Tells Terraform to hide this password in all console logs
   description = "The root master password for the PostgreSQL database instance"
 }
