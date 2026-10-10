@@ -1,19 +1,19 @@
-# Block local terraform cache and binaries
+# Ignore local Terraform working data and the provider lock file.
 .terraform/
 .terraform.lock.hcl
 
-# Block all local state tracking files
+# Ignore local Terraform state files.
 *.tfstate
 *.tfstate.*
 
-# Block runtime crash logs
+# Ignore Terraform crash logs and other log files.
 crash.log
 *.log
 
-# Local Variables Override Arrays
+# Ignore local Terraform variable files.
 *.tfvars
 *.tfvars.json
 
-# Environment Secrets Profiles
+# Ignore local environment files.
 .env
 .env.*

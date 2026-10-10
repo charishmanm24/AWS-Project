@@ -17,14 +17,14 @@ module "container_compute_tier" {
   private_subnet_ids = module.network_backbone.private_subnet_ids
 }
 
-# Output tracking string to display our live website domain address link inside GitHub logs
+# Expose the load balancer URL as a Terraform output.
 output "live_application_endpoint_url" {
   value       = module.container_compute_tier.load_balancer_url
   description = "The live public address to visit your enterprise application mesh"
 }
 
 
-# DATABASE TIER MODULE (Amazon Aurora Serverless v2)
+# PostgreSQL database storage tier configuration block
 module "database_storage_tier" {
   source = "./modules/rds"
 
@@ -34,4 +34,3 @@ module "database_storage_tier" {
   ecs_tasks_security_group_id = module.container_compute_tier.ecs_tasks_security_group_id
   db_password                 = var.db_password
 }
-

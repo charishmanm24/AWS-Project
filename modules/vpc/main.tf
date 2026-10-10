@@ -30,7 +30,7 @@ resource "aws_subnet" "public" {
   }
 }
 
-# Private Subnets (For Container Workloads & Databases)
+# Private subnets for container workloads.
 resource "aws_subnet" "private" {
   count             = length(var.private_subnet_cidrs)
   vpc_id            = aws_vpc.main.id
@@ -44,7 +44,7 @@ resource "aws_subnet" "private" {
   }
 }
 
-#Internet Gateway to provide public routing access out of the VPC boundary
+# Internet Gateway provides public routing for the VPC.
 # Internet Gateway
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
@@ -89,7 +89,7 @@ resource "aws_eip" "nat_eip" {
   }
 }
 
-# Deploy the NAT Gateway inside the first public subnet instance
+# Deploy the NAT Gateway in the first public subnet.
 resource "aws_nat_gateway" "nat" {
   allocation_id = aws_eip.nat_eip.id
   subnet_id     = aws_subnet.public[0].id
@@ -122,7 +122,7 @@ resource "aws_route_table_association" "private" {
   route_table_id = aws_route_table.private.id
 }
 
-# Isolated Multi-AZ Database Subnets 
+# Isolated database subnets in multiple availability zones.
 resource "aws_subnet" "database_isolated_tier" {
   count             = 2
   vpc_id            = aws_vpc.main.id
@@ -136,7 +136,7 @@ resource "aws_subnet" "database_isolated_tier" {
   }
 }
 
-# DB Subnet required by Amazon Aurora
+# DB subnet group for RDS instances across multiple availability zones.
 resource "aws_db_subnet_group" "aurora_subnet_cluster_group" {
   name        = "${var.environment}-aurora-subnet-group"
   description = "Binds target isolated subnets across multiple availability zones for data access layers"

@@ -1,6 +1,4 @@
-# SECURITY TIER (Firewalls)
-
-# Public Web Facing Load Balancer Security Group
+# Allow public HTTP traffic to the load balancer.
 resource "aws_security_group" "load_balancer_security_edge" {
   name        = "${var.environment}-ecs-alb-sg"
   description = "Controls public inbound access rules into the application load balancer"
@@ -10,7 +8,7 @@ resource "aws_security_group" "load_balancer_security_edge" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Permits public web requests
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
@@ -23,7 +21,7 @@ resource "aws_security_group" "load_balancer_security_edge" {
   tags = { Name = "${var.environment}-ecs-alb-security-group" }
 }
 
-# Private Serverless Container Tasks Security Group
+# Allow application traffic only from the load balancer.
 resource "aws_security_group" "container_workload_isolation" {
   name        = "${var.environment}-ecs-tasks-sg"
   description = "Isolates serverless container tasks from external direct network scans"
@@ -33,7 +31,7 @@ resource "aws_security_group" "container_workload_isolation" {
     from_port       = 80
     to_port         = 80
     protocol        = "tcp"
-    security_groups = [aws_security_group.load_balancer_security_edge.id] # Least Privilege: ONLY traffic from ALB allowed!
+    security_groups = [aws_security_group.load_balancer_security_edge.id] # Allow traffic from resources using the ALB security group.
   }
 
   egress {
@@ -47,7 +45,7 @@ resource "aws_security_group" "container_workload_isolation" {
 }
 
 
-# ROUTING TIER (High Availability Application Load Balancer)
+# Public load balancer and target group.
 resource "aws_lb" "application_routing_hub" {
   name               = "${var.environment}-app-load-balancer"
   internal           = false
@@ -63,7 +61,7 @@ resource "aws_lb_target_group" "container_target_pool" {
   port        = 80
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
-  target_type = "ip" # Crucial: Fargate requires target allocation mapped by virtual IP address
+  target_type = "ip" # Fargate tasks register by IP.
 
   health_check {
     path                = "/"
@@ -86,11 +84,7 @@ resource "aws_lb_listener" "http_ingress_router" {
   }
 }
 
-# ==============================================================================
-# 3. ECS COMPUTE LAYER (Orchestrator Cluster & Serverless Tasks)
-# ==============================================================================
-
-# Core Orchestration Cluster
+# ECS cluster and task execution role.
 resource "aws_ecs_cluster" "production_container_grid" {
   name = "${var.environment}-ecs-orchestration-cluster"
   tags = { Name = "${var.environment}-ecs-cluster" }
@@ -118,10 +112,10 @@ resource "aws_iam_role_policy_attachment" "attach_standard_ecs_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Centralized Monitoring for Serverless Logs
+# Keep task logs for one week.
 resource "aws_cloudwatch_log_group" "container_monitoring_logs" {
   name              = "/ecs/${var.environment}-web-application"
-  retention_in_days = 7 # Automatically purges old log traces to optimize cloud costs
+  retention_in_days = 7
 
   tags = {
     Name        = "${var.environment}-ecs-log-group"
@@ -129,7 +123,7 @@ resource "aws_cloudwatch_log_group" "container_monitoring_logs" {
   }
 }
 
-# Task Definition with Integrated Logging Agent
+# Run Nginx on Fargate and send logs to CloudWatch.
 resource "aws_ecs_task_definition" "web_application_blueprint" {
   family                   = "${var.environment}-web-app-task"
   network_mode             = "awsvpc"
@@ -158,23 +152,21 @@ resource "aws_ecs_task_definition" "web_application_blueprint" {
   }])
 }
 
-# Grants Fargate the ability to stream runtime logs directly out to the CloudWatch API
 resource "aws_iam_role_policy_attachment" "attach_cloudwatch_logging_policy" {
   role       = aws_iam_role.container_execution_profile.name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
 }
 
 
-# Continuous Active Service Engine Manager
 resource "aws_ecs_service" "orchestrated_runtime_service" {
   name            = "${var.environment}-core-microservice"
   cluster         = aws_ecs_cluster.production_container_grid.id
   task_definition = aws_ecs_task_definition.web_application_blueprint.arn
-  desired_count   = 2 # High Availability: Forces 2 identical container copies to always run in parallel
+  desired_count   = 2
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets          = var.private_subnet_ids # Safely isolated deep inside our private network subnets
+    subnets          = var.private_subnet_ids
     security_groups  = [aws_security_group.container_workload_isolation.id]
     assign_public_ip = true
   }
@@ -189,9 +181,7 @@ resource "aws_ecs_service" "orchestrated_runtime_service" {
 }
 
 
-# SECURITY TIER (AWS WAFv2 Layer 7 Protection Shield)
-
-# WAFv2 Web Access Control List (Web ACL)
+# Apply managed rules and rate limiting to the load balancer.
 resource "aws_wafv2_web_acl" "alb_security_shield" {
   name        = "${var.environment}-alb-waf-shield"
   description = "Layer 7 firewall blocking common vulnerabilities and brute-force web vector sets"
@@ -201,7 +191,7 @@ resource "aws_wafv2_web_acl" "alb_security_shield" {
     allow {}
   }
 
-  # Rule 1: AWS Common Vulnerabilities Managed Rule Set (Protects against SQLi, XSS, local file inclusion)
+  # Rule 1: Apply AWS's Common Rule Set managed protections.
   rule {
     name     = "AWS-AWSManagedRulesCommonRuleSet"
     priority = 1
@@ -224,7 +214,7 @@ resource "aws_wafv2_web_acl" "alb_security_shield" {
     }
   }
 
-  # Rule 2: IP Rate Limiting Shield (Blocks brute-force vectors and Layer 7 DDoS flooding)
+  # Rule 2: Block requests from IPs that exceed the configured rate threshold.
   rule {
     name     = "RateLimitShield"
     priority = 2
@@ -235,7 +225,7 @@ resource "aws_wafv2_web_acl" "alb_security_shield" {
 
     statement {
       rate_based_statement {
-        limit              = 500 # Max requests permitted per rolling 5-minute window per singular source IP
+        limit              = 500
         aggregate_key_type = "IP"
       }
     }

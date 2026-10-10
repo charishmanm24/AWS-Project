@@ -1,6 +1,4 @@
-# ==============================================================================
-# Isolated Database Firewall Rules
-# ==============================================================================
+# Database Firewall Rules
 resource "aws_security_group" "database_firewall_shield" {
   name        = "${var.environment}-rds-postgres-sg"
   description = "Restricts database port entry rules to verified inner container layers only"
@@ -10,7 +8,7 @@ resource "aws_security_group" "database_firewall_shield" {
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
-    security_groups = [var.ecs_tasks_security_group_id] # Zero Trust: Only ECS tasks SG can hit the DB!
+    security_groups = [var.ecs_tasks_security_group_id] # Allow connections from resources using the ECS tasks security group.
   }
 
   egress {
@@ -23,9 +21,8 @@ resource "aws_security_group" "database_firewall_shield" {
   tags = { Name = "${var.environment}-database-security-group" }
 }
 
-# ==============================================================================
+
 # Standard PostgreSQL Instance
-# ==============================================================================
 resource "aws_db_instance" "postgres_data_backbone" {
   identifier             = "${var.environment}-enterprise-postgres-db"
   engine                 = "postgres"

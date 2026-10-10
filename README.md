@@ -4,6 +4,16 @@ This repository contains Terraform configuration for a small AWS web stack. It c
 
 This is a starter/demo configuration, not a production-ready application. Review the security and availability notes below before deploying it to an AWS account.
 
+## Before you deploy
+
+Deploying this configuration creates resources in **your AWS account** and can incur charges. Costs may include the NAT Gateway, Application Load Balancer, WAF, ECS tasks, RDS instance and storage, CloudWatch logs, and data transfer. Charges depend on usage and region; do not assume the resources are covered by the AWS Free Tier. Check current AWS pricing, set a billing budget or alert, and destroy resources you no longer need. Review the Terraform plan before applying.
+
+Use your own AWS account and credentials with permission to create and manage the resources. For local runs, authenticate through the AWS CLI (for example, a named profile or IAM Identity Center) or another supported AWS credential provider. Avoid long-lived access keys where possible.
+
+The S3 backend in `backend.tf` is configured with specific bucket, table, and region values. Create your own S3 bucket and DynamoDB lock table, then update those values before running `terraform init`. Backend settings are separate from normal Terraform input variables.
+
+Provide the database password through `TF_VAR_db_password` using a secure local secret manager or environment setup. If using the included GitHub Actions deployment workflow, configure `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `DB_PASSWORD` as GitHub Actions secrets, preferably scoped to the `prod` environment. The workflow passes the password to Terraform as `TF_VAR_db_password` and runs `terraform apply -auto-approve` on pushes to `main`. Protect the branch and environment, and never commit credentials or the database password.
+
 ## Architecture
 
 
@@ -47,14 +57,12 @@ The ALB listener accepts HTTP on port 80 and forwards requests to the ECS servic
 
 ## Important limitations and deployment cautions
 
-- **Database password input:** The RDS password is declared as a sensitive Terraform variable. The GitHub Actions workflow maps the GitHub secret `DB_PASSWORD` to Terraform's `TF_VAR_db_password` environment variable. Configure `DB_PASSWORD` as a GitHub Actions secret (repository or `prod` environment); never put its value in this README or commit it to the repository.
 - **Terraform state contains secrets:** Marking a variable `sensitive` hides it from normal Terraform output, but does not prevent the database password from being stored in Terraform state. Restrict access to the state bucket and its backups. The S3 backend enables encryption, but state access should still be treated as access to secrets.
 - **The database is a single instance.** A subnet group spans two AZs, but the RDS instance does not enable Multi-AZ deployment. This does not provide database failover across AZs.
 - **Two desired tasks do not guarantee one task per AZ.** The service uses both private subnets, but the configuration does not enforce an even placement across AZs.
 - **There is one NAT Gateway.** It is a single point of egress and may be a cross-AZ dependency for workloads in the other AZ. It is not a highly available NAT design.
 - **The ALB only serves HTTP.** No HTTPS listener or TLS certificate is configured.
-- **S3 versioning is not configured here.** Enable bucket versioning separately if state history and recovery are required. The backend configuration uses a DynamoDB lock table.
-- **The GitHub Actions workflow applies on pushes to `main`.** Configure repository/environment protections, AWS credentials, and review requirements carefully before enabling it.
+- **S3 versioning is not configured here.** Enable bucket versioning separately if state history and recovery are required.
 - **The application is only the stock Nginx image.** It does not deploy application code or connect the web container to the database.
 
 ## Repository layout
@@ -85,9 +93,6 @@ The ALB listener accepts HTTP on port 80 and forwards requests to the ECS servic
 ## Requirements
 
 - Terraform version `1.5.0` or later.
-- AWS credentials with permission to create the configured resources.
-- An existing S3 bucket and DynamoDB table for the Terraform backend, as specified in `backend.tf`.
-- GitHub Actions secrets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `DB_PASSWORD` if using the workflow. The workflow passes `DB_PASSWORD` to Terraform as `TF_VAR_db_password`.
 
 The provider and workflow currently target `ap-south-1`. Update the provider/workflow configuration together if deploying in another region.
 
@@ -102,7 +107,7 @@ terraform validate
 terraform plan
 ```
 
-For local plan or apply operations, also provide the database password through the `TF_VAR_db_password` environment variable using your preferred secure local secret-management method. Do not put the password directly in a command that may be saved in shell history.
+Terraform uses your configured AWS credential provider. Set `TF_VAR_db_password` securely before planning or applying; avoid putting credentials or the password directly in commands that may be saved in shell history.
 
 Review the plan and make sure the backend, AWS account, region, and credentials are correct before deploying:
 
@@ -110,4 +115,4 @@ Review the plan and make sure the backend, AWS account, region, and credentials 
 terraform apply
 ```
 
-The GitHub Actions workflow runs formatting, initialization, and planning for pushes and pull requests targeting `main`. It runs `terraform apply -auto-approve` for pushes to `main`.
+The GitHub Actions workflow runs formatting, initialization, and validation for pull requests targeting `main`.
