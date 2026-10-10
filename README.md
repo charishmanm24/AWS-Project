@@ -14,16 +14,18 @@ The S3 backend in `backend.tf` is configured with specific bucket, table, and re
 
 Provide the database password through `TF_VAR_db_password` using a secure local secret manager or environment setup. If using the included GitHub Actions deployment workflow, configure `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `DB_PASSWORD` as GitHub Actions secrets, preferably scoped to the `prod` environment. The workflow passes the password to Terraform as `TF_VAR_db_password` and runs `terraform apply -auto-approve` on pushes to `main`. Protect the branch and environment, and never commit credentials or the database password.
 
+
 ## Architecture
 
 ```mermaid
 flowchart TD
-    Internet([Global Internet]) --> WAF["AWS WAFv2 Web ACL (Edge Shield)"]
-    WAF --> IGW["Internet Gateway (IGW)"]
-    
+    %% External Entities and Regional Protection Layers
+    Internet([Global Internet])
+    WAF["AWS WAFv2 Web ACL\n(Associated with ALB)"]
+
+    %% Custom Virtual Private Cloud Boundary
     subgraph VPC [Custom VPC Boundary: 10.0.0.0/16]
-        IGW <--> ALB
-        NAT --> IGW
+        IGW["Internet Gateway (IGW)"]
         
         subgraph DMZ [Public DMZ Subnets]
             ALB["Public ALB (HTTP :80)"]
@@ -31,14 +33,27 @@ flowchart TD
         end
 
         subgraph Private [Private App Subnets]
-            ALB --> ECS["ECS Fargate Service (2 Tasks)"]
+            ECS["ECS Fargate Service (2 Tasks)"]
         end
 
         subgraph Data [Isolated Data Subnets]
-            ECS --> DB["RDS PostgreSQL (db.t3.micro)"]
+            DB["RDS PostgreSQL (db.t3.micro)"]
         end
     end
+
+    %% Inbound Traffic Flow (Stateful Ingress Paths)
+    Internet ===>|1. User Request| IGW
+    IGW ===>|2. Forward Ingress| ALB
+    WAF -.-|Inline Policy Inspection| ALB
+    ALB ===>|3. Proxied Reverse Proxy| ECS
+    ECS ===>|4. Database Queries| DB
+
+    %% Outbound Traffic Flow (Stateful Egress Paths)
+    ECS -.->|A. Outbound Image Pull / Egress| NAT
+    NAT -.->|B. Route to IGW| IGW
+    IGW -.->|C. Exit Network| Internet
 ```
+
 
 
 
