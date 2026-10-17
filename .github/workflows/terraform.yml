@@ -60,8 +60,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-          audience: https://github.com
-
+          audience: sts.amazonaws.com
 
       - name: Terraform init
         run: terraform init
