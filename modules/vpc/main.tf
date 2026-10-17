@@ -2,20 +2,18 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
-# The Virtual Private Cloud Network
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
 
   tags = {
-    Name        = "${var.environment}-custom-vpc"
+    Name        = "${var.environment}-vpc"
     Environment = var.environment
     ManagedBy   = "Terraform"
   }
 }
 
-# Public Subnets (For Load Balancers & Gateways)
 resource "aws_subnet" "public" {
   count                   = length(var.public_subnet_cidrs)
   vpc_id                  = aws_vpc.main.id
@@ -24,13 +22,12 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name        = "${var.environment}-public-subnet-az-${count.index + 1}"
+    Name        = "${var.environment}-public-subnet-${count.index + 1}"
     Environment = var.environment
     Tier        = "Public"
   }
 }
 
-# Private subnets for container workloads.
 resource "aws_subnet" "private" {
   count             = length(var.private_subnet_cidrs)
   vpc_id            = aws_vpc.main.id
@@ -38,30 +35,27 @@ resource "aws_subnet" "private" {
   availability_zone = data.aws_availability_zones.available.names[count.index]
 
   tags = {
-    Name        = "${var.environment}-private-subnet-az-${count.index + 1}"
+    Name        = "${var.environment}-private-subnet-${count.index + 1}"
     Environment = var.environment
     Tier        = "Private"
   }
 }
 
-# Internet Gateway provides public routing for the VPC.
-# Internet Gateway
-resource "aws_internet_gateway" "igw" {
+resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name        = "${var.environment}-custom-igw"
+    Name        = "${var.environment}-igw"
     Environment = var.environment
   }
 }
 
-# Public Route Table Configuration
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.igw.id
+    gateway_id = aws_internet_gateway.main.id
   }
 
   tags = {
@@ -70,18 +64,15 @@ resource "aws_route_table" "public" {
   }
 }
 
-# Bind Public Subnets to Public Route Table
 resource "aws_route_table_association" "public" {
   count          = length(var.public_subnet_cidrs)
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
 }
 
-
-# Allocate an Elastic IP for the NAT Gateway
-resource "aws_eip" "nat_eip" {
+resource "aws_eip" "nat" {
   domain     = "vpc"
-  depends_on = [aws_internet_gateway.igw]
+  depends_on = [aws_internet_gateway.main]
 
   tags = {
     Name        = "${var.environment}-nat-eip"
@@ -89,9 +80,8 @@ resource "aws_eip" "nat_eip" {
   }
 }
 
-# Deploy the NAT Gateway in the first public subnet.
-resource "aws_nat_gateway" "nat" {
-  allocation_id = aws_eip.nat_eip.id
+resource "aws_nat_gateway" "main" {
+  allocation_id = aws_eip.nat.id
   subnet_id     = aws_subnet.public[0].id
 
   tags = {
@@ -100,13 +90,12 @@ resource "aws_nat_gateway" "nat" {
   }
 }
 
-# Private Route Table routing private subnet traffic to the NAT Gateway
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
 
   route {
     cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.nat.id
+    nat_gateway_id = aws_nat_gateway.main.id
   }
 
   tags = {
@@ -115,32 +104,31 @@ resource "aws_route_table" "private" {
   }
 }
 
-# Bind Private Subnets to the Private Route Table
 resource "aws_route_table_association" "private" {
   count          = length(var.private_subnet_cidrs)
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private.id
 }
 
-# Isolated database subnets in multiple availability zones.
-resource "aws_subnet" "database_isolated_tier" {
+resource "aws_subnet" "database" {
   count             = 2
   vpc_id            = aws_vpc.main.id
   cidr_block        = ["10.0.21.0/24", "10.0.22.0/24"][count.index]
   availability_zone = data.aws_availability_zones.available.names[count.index]
 
   tags = {
-    Name        = "${var.environment}-database-subnet-az-${count.index + 1}"
+    Name        = "${var.environment}-database-subnet-${count.index + 1}"
     Environment = var.environment
     Tier        = "Database"
   }
 }
 
-# DB subnet group for RDS instances across multiple availability zones.
-resource "aws_db_subnet_group" "aurora_subnet_cluster_group" {
-  name        = "${var.environment}-aurora-subnet-group"
-  description = "Binds target isolated subnets across multiple availability zones for data access layers"
-  subnet_ids  = aws_subnet.database_isolated_tier[*].id
+resource "aws_db_subnet_group" "main" {
+  name        = "${var.environment}-db-subnet-group"
+  description = "Database subnet group for the RDS instance."
+  subnet_ids  = aws_subnet.database[*].id
 
-  tags = { Name = "${var.environment}-aurora-subnet-group" }
+  tags = {
+    Name = "${var.environment}-db-subnet-group"
+  }
 }

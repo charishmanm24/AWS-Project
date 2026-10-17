@@ -1,7 +1,6 @@
-# Allow public HTTP traffic to the load balancer.
-resource "aws_security_group" "load_balancer_security_edge" {
-  name        = "${var.environment}-ecs-alb-sg"
-  description = "Controls public inbound access rules into the application load balancer"
+resource "aws_security_group" "alb" {
+  name        = "${var.environment}-alb-sg"
+  description = "Allow public HTTP traffic to the ALB."
   vpc_id      = var.vpc_id
 
   ingress {
@@ -18,20 +17,21 @@ resource "aws_security_group" "load_balancer_security_edge" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "${var.environment}-ecs-alb-security-group" }
+  tags = {
+    Name = "${var.environment}-alb-sg"
+  }
 }
 
-# Allow application traffic only from the load balancer.
-resource "aws_security_group" "container_workload_isolation" {
-  name        = "${var.environment}-ecs-tasks-sg"
-  description = "Isolates serverless container tasks from external direct network scans"
+resource "aws_security_group" "app" {
+  name        = "${var.environment}-app-sg"
+  description = "Allow only ALB traffic into the ECS tasks."
   vpc_id      = var.vpc_id
 
   ingress {
     from_port       = 80
     to_port         = 80
     protocol        = "tcp"
-    security_groups = [aws_security_group.load_balancer_security_edge.id] # Allow traffic from resources using the ALB security group.
+    security_groups = [aws_security_group.alb.id]
   }
 
   egress {
@@ -41,27 +41,29 @@ resource "aws_security_group" "container_workload_isolation" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "${var.environment}-ecs-tasks-security-group" }
+  tags = {
+    Name = "${var.environment}-app-sg"
+  }
 }
 
-
-# Public load balancer and target group.
-resource "aws_lb" "application_routing_hub" {
-  name               = "${var.environment}-app-load-balancer"
+resource "aws_lb" "main" {
+  name               = "${var.environment}-alb"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.load_balancer_security_edge.id]
+  security_groups    = [aws_security_group.alb.id]
   subnets            = var.public_subnet_ids
 
-  tags = { Name = "${var.environment}-main-application-alb" }
+  tags = {
+    Name = "${var.environment}-alb"
+  }
 }
 
-resource "aws_lb_target_group" "container_target_pool" {
-  name        = "${var.environment}-container-tg"
+resource "aws_lb_target_group" "main" {
+  name        = "${var.environment}-tg"
   port        = 80
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
-  target_type = "ip" # Fargate tasks register by IP.
+  target_type = "ip"
 
   health_check {
     path                = "/"
@@ -73,26 +75,27 @@ resource "aws_lb_target_group" "container_target_pool" {
   }
 }
 
-resource "aws_lb_listener" "http_ingress_router" {
-  load_balancer_arn = aws_lb.application_routing_hub.arn
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.main.arn
   port              = "80"
   protocol          = "HTTP"
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.container_target_pool.arn
+    target_group_arn = aws_lb_target_group.main.arn
   }
 }
 
-# ECS cluster and task execution role.
-resource "aws_ecs_cluster" "production_container_grid" {
-  name = "${var.environment}-ecs-orchestration-cluster"
-  tags = { Name = "${var.environment}-ecs-cluster" }
+resource "aws_ecs_cluster" "main" {
+  name = "${var.environment}-cluster"
+
+  tags = {
+    Name = "${var.environment}-cluster"
+  }
 }
 
-# IAM Execution Profile Role (Gives ECS permission to pull down Docker application images)
-resource "aws_iam_role" "container_execution_profile" {
-  name = "${var.environment}-ecs-execution-iam-role"
+resource "aws_iam_role" "task_execution" {
+  name = "${var.environment}-ecs-task-execution-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -107,88 +110,87 @@ resource "aws_iam_role" "container_execution_profile" {
     ]
   })
 }
-resource "aws_iam_role_policy_attachment" "attach_standard_ecs_policy" {
-  role       = aws_iam_role.container_execution_profile.name
+
+resource "aws_iam_role_policy_attachment" "task_execution" {
+  role       = aws_iam_role.task_execution.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Keep task logs for one week.
-resource "aws_cloudwatch_log_group" "container_monitoring_logs" {
-  name              = "/ecs/${var.environment}-web-application"
+resource "aws_cloudwatch_log_group" "app" {
+  name              = "/ecs/${var.environment}-app"
   retention_in_days = 7
 
   tags = {
-    Name        = "${var.environment}-ecs-log-group"
+    Name        = "${var.environment}-app-log-group"
     Environment = var.environment
   }
 }
 
-# Run Nginx on Fargate and send the logs to CloudWatch.
-resource "aws_ecs_task_definition" "web_application_blueprint" {
-  family                   = "${var.environment}-web-app-task"
+resource "aws_ecs_task_definition" "app" {
+  family                   = "${var.environment}-app"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = "256"
   memory                   = "512"
-  execution_role_arn       = aws_iam_role.container_execution_profile.arn
+  execution_role_arn       = aws_iam_role.task_execution.arn
 
-  container_definitions = jsonencode([{
-    name      = "web-service-cell"
-    image     = "nginx:alpine"
-    essential = true
-    portMappings = [{
-      containerPort = 80
-      hostPort      = 80
-    }]
+  container_definitions = jsonencode([
+    {
+      name      = "web"
+      image     = "nginx:alpine"
+      essential = true
+      portMappings = [
+        {
+          containerPort = 80
+          hostPort      = 80
+        }
+      ]
 
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.container_monitoring_logs.name
-        "awslogs-region"        = "ap-south-1"
-        "awslogs-stream-prefix" = "fargate-worker"
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.app.name
+          "awslogs-region"        = "ap-south-1"
+          "awslogs-stream-prefix" = "fargate"
+        }
       }
     }
-  }])
+  ])
 }
 
-
-resource "aws_ecs_service" "orchestrated_runtime_service" {
-  name            = "${var.environment}-core-microservice"
-  cluster         = aws_ecs_cluster.production_container_grid.id
-  task_definition = aws_ecs_task_definition.web_application_blueprint.arn
+resource "aws_ecs_service" "main" {
+  name            = "${var.environment}-service"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.app.arn
   desired_count   = 2
   launch_type     = "FARGATE"
 
   network_configuration {
     subnets          = var.private_subnet_ids
-    security_groups  = [aws_security_group.container_workload_isolation.id]
+    security_groups  = [aws_security_group.app.id]
     assign_public_ip = false
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.container_target_pool.arn
-    container_name   = "web-service-cell"
+    target_group_arn = aws_lb_target_group.main.arn
+    container_name   = "web"
     container_port   = 80
   }
 
-  depends_on = [aws_lb_listener.http_ingress_router]
+  depends_on = [aws_lb_listener.http]
 }
 
-
-# Apply managed rules and rate limiting to the load balancer.
-resource "aws_wafv2_web_acl" "alb_security_shield" {
-  name        = "${var.environment}-alb-waf-shield"
-  description = "Layer 7 firewall blocking common vulnerabilities and brute-force web vector sets"
+resource "aws_wafv2_web_acl" "main" {
+  name        = "${var.environment}-waf"
+  description = "Protect the ALB with common rule sets and rate limiting."
   scope       = "REGIONAL"
 
   default_action {
     allow {}
   }
 
-  # Rule 1: Apply AWS's Common Rule Set managed protections.
   rule {
-    name     = "AWS-AWSManagedRulesCommonRuleSet"
+    name     = "AWSManagedRulesCommonRuleSet"
     priority = 1
 
     override_action {
@@ -204,12 +206,11 @@ resource "aws_wafv2_web_acl" "alb_security_shield" {
 
     visibility_config {
       cloudwatch_metrics_enabled = true
-      metric_name                = "${var.environment}-waf-common-rules-metric"
+      metric_name                = "${var.environment}-waf-common-rules"
       sampled_requests_enabled   = true
     }
   }
 
-  # Rule 2: Block requests from IPs that exceed the configured rate threshold.
   rule {
     name     = "RateLimitShield"
     priority = 2
@@ -227,20 +228,19 @@ resource "aws_wafv2_web_acl" "alb_security_shield" {
 
     visibility_config {
       cloudwatch_metrics_enabled = true
-      metric_name                = "${var.environment}-waf-rate-limit-metric"
+      metric_name                = "${var.environment}-waf-rate-limit"
       sampled_requests_enabled   = true
     }
   }
 
   visibility_config {
     cloudwatch_metrics_enabled = true
-    metric_name                = "${var.environment}-waf-global-acl-metric"
+    metric_name                = "${var.environment}-waf-acl"
     sampled_requests_enabled   = true
   }
 }
 
-# Bind the WAFv2 Web ACL directly to your Application Load Balancer
-resource "aws_wafv2_web_acl_association" "waf_alb_binding" {
-  resource_arn = aws_lb.application_routing_hub.arn
-  web_acl_arn  = aws_wafv2_web_acl.alb_security_shield.arn
+resource "aws_wafv2_web_acl_association" "main" {
+  resource_arn = aws_lb.main.arn
+  web_acl_arn  = aws_wafv2_web_acl.main.arn
 }

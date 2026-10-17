@@ -1,19 +1,19 @@
 variable "environment" {
   type        = string
-  description = "The target deployment lifecycle stage tier name tag"
+  description = "Deployment environment name used in resource tags."
 }
 
 variable "vpc_id" {
   type        = string
-  description = "The reference ID string of our custom backbone network VPC"
+  description = "VPC ID for the ALB and ECS tasks."
 }
 
 variable "public_subnet_ids" {
   type        = list(string)
-  description = "The public subnets where the routing backend Application Load Balancer will live"
+  description = "Public subnet IDs for the ALB."
 }
 
 variable "private_subnet_ids" {
   type        = list(string)
-  description = "The secure private subnets where container tasks will run isolated"
+  description = "Private subnet IDs for the ECS tasks."
 }

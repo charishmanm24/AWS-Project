@@ -1,19 +1,19 @@
 output "vpc_id" {
   value       = aws_vpc.main.id
-  description = "The generated reference token identifier of the backbone network VPC"
+  description = "VPC ID for the project network."
 }
 
 output "public_subnet_ids" {
   value       = aws_subnet.public[*].id
-  description = "List containing the resource IDs of the generated public subnet routing grid"
+  description = "Public subnet IDs for the ALB and NAT gateway."
 }
 
 output "private_subnet_ids" {
   value       = aws_subnet.private[*].id
-  description = "List containing the resource IDs of the generated private isolated subnet layout"
+  description = "Private subnet IDs for the ECS tasks."
 }
 
 output "db_subnet_group_name" {
-  value       = aws_db_subnet_group.aurora_subnet_cluster_group.name
-  description = "The database subnet group identifier exported to anchor the RDS database tier"
+  value       = aws_db_subnet_group.main.name
+  description = "Database subnet group name used by the RDS instance."
 }

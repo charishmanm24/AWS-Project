@@ -1,78 +1,93 @@
-# AWS ECS Fargate and PostgreSQL Infrastructure
+# AWS Terraform Portfolio Project
 
-This repository contains Terraform configuration for a small AWS web stack. It creates a VPC, an internet-facing Application Load Balancer (ALB), an ECS Fargate service running the stock `nginx:alpine` image, and a PostgreSQL RDS instance.
+This repository contains a small AWS infrastructure project built with Terraform. It provisions a VPC, public ALB, ECS Fargate service, WAF, and PostgreSQL RDS instance.
 
-This is a starter/demo configuration, not a production-ready application. Review the security and availability notes below before deploying it to an AWS account.
+This is a personal portfolio project for Cloud Engineer / DevOps job applications. It is intentionally simple and demonstrates core AWS networking, security, and automation patterns without pretending to be a production-grade enterprise platform.
 
 ## Before you deploy
 
-Deploying this configuration creates resources in **your AWS account** and can incur charges. Costs may include the NAT Gateway, Application Load Balancer, WAF, ECS tasks, RDS instance and storage, CloudWatch logs, and data transfer. Charges depend on usage and region; do not assume the resources are covered by the AWS Free Tier. Check current AWS pricing, set a billing budget or alert, and destroy resources you no longer need. Review the Terraform plan before applying.
-
-Use your own AWS account and credentials with permission to create and manage the resources. For local runs, authenticate through the AWS CLI (for example, a named profile or IAM Identity Center) or another supported AWS credential provider. Avoid long-lived access keys where possible.
-
-The S3 backend in `backend.tf` is configured with specific bucket, table, and region values. Create your own S3 bucket and DynamoDB lock table, then update those values before running `terraform init`. Backend settings are separate from normal Terraform input variables.
-
-Provide the database password through `TF_VAR_db_password` using a secure local secret manager or environment setup. If using the included GitHub Actions deployment workflow, configure `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `DB_PASSWORD` as GitHub Actions secrets, preferably scoped to the `prod` environment. The workflow passes the password to Terraform as `TF_VAR_db_password` and runs `terraform apply -auto-approve` on pushes to `main`. Protect the branch and environment, and never commit credentials or the database password.
-
+- Deploying this stack creates live AWS resources and can incur charges.
+- Costs may include NAT Gateway, ALB, WAF, ECS, RDS, CloudWatch logs, and data transfer.
+- Use your own AWS account and review the Terraform plan before applying.
+- Create your own Terraform backend bucket and DynamoDB lock table before `terraform init`.
+- Keep database credentials in AWS Secrets Manager; do not commit passwords to the repository.
 
 ## Architecture
-     
+
 ```mermaid
 flowchart TB
-    Internet([Global Internet])
-    WAF["AWS WAFv2 Web ACL"]
+    Internet([Internet])
 
-    subgraph VPC["Custom VPC: 10.0.0.0/16"]
+    subgraph VPC["VPC 10.0.0.0/16"]
         IGW["Internet Gateway"]
 
-        subgraph Public["Public Subnets<br/>10.0.1.0/24 and 10.0.2.0/24"]
-            ALB["Public ALB<br/>HTTP port 80"]
-            NAT["Single NAT Gateway<br/>with Elastic IP"]
+        subgraph Public["Public Subnets"]
+            ALB["ALB\nHTTP :80"]
+            NAT["NAT Gateway"]
         end
 
-        subgraph Private["Private App Subnets<br/>10.0.11.0/24 and 10.0.12.0/24"]
-            ECS["ECS Fargate Service<br/>2 nginx:alpine tasks<br/>No public IP"]
+        subgraph Private["Private Subnets"]
+            ECS["ECS Fargate\n2 tasks\nNo public IP"]
         end
 
-        subgraph Data["Isolated Database Subnets<br/>10.0.21.0/24 and 10.0.22.0/24"]
-            DB["RDS PostgreSQL<br/>db.t3.micro"]
+        subgraph Data["Database Subnets"]
+            RDS["RDS PostgreSQL\ndb.t3.micro"]
         end
     end
 
-    Internet <-->|Inbound and response traffic| IGW
-    IGW -->|Public subnet route| ALB
-    WAF -.->|Associated with ALB| ALB
-    ALB -->|Forwards HTTP traffic| ECS
-    ECS -.->|Security group permits TCP 5432| DB
-    ECS -.->|Private subnet default route| NAT
-    NAT -.->|Public subnet route| IGW
+    WAF["AWS WAFv2"]
+
+    Internet --> IGW
+    IGW --> ALB
+    WAF --> ALB
+    ALB --> ECS
+    ECS -->|TCP 5432 from ECS SG| RDS
+    ECS --> NAT
+    NAT --> IGW
 ```
 
+Key design decisions:
 
-The VPC module defines public and private subnets from the CIDR lists in the root `main.tf`. It also creates two database subnets using `10.0.21.0/24` and `10.0.22.0/24`. Subnets are assigned to the first available AZs returned by AWS in the configured region; the AZ names are not hard-coded.
+- Public traffic terminates at the ALB, not directly at ECS.
+- ECS tasks run in private subnets with `assign_public_ip = false`.
+- Private subnets route outbound traffic through a single NAT Gateway.
+- Database access is limited to the ECS task security group on port 5432.
+- WAF is attached to the ALB to add basic web request filtering.
 
-The ALB listener accepts HTTP on port 80 and forwards requests to the ECS service. A WAFv2 web ACL is associated with the ALB. The ECS task security group allows inbound port 80 from the ALB security group, and the database security group allows PostgreSQL port 5432 from the ECS task security group.
+## What this project does
 
-## What the configuration creates
+- Provisions a custom VPC with public, private, and isolated database subnets.
+- Creates an internet-facing ALB with an HTTP listener on port 80.
+- Runs a Fargate service with two `nginx:alpine` tasks in private subnets.
+- Protects the ALB with AWS WAFv2 managed rules and rate limiting.
+- Deploys an RDS PostgreSQL instance with a security-group-based access rule.
+- Stores Terraform remote state in S3 with DynamoDB locking.
+- Runs Terraform validation and deploy automation in GitHub Actions.
 
-- A custom VPC with public, private, and database subnets.
-- One NAT Gateway in the first public subnet. Both private subnets use a shared private route table that routes outbound traffic through this gateway.
-- An internet-facing ALB with an HTTP listener and target group health checks on `/`.
-- An ECS cluster and Fargate service with `desired_count = 2`, using the `nginx:alpine` image.
-- A WAFv2 web ACL with the AWS Common Rule Set and an IP-based rate-based rule configured with a limit of 500 requests.
-- A CloudWatch log group for ECS logs with seven-day retention.
-- One PostgreSQL 15.19 RDS instance using class `db.t3.micro` and 20 GiB of allocated storage.
-- An S3 Terraform backend configured for encryption and DynamoDB state locking.
+## CI/CD flow
 
-## Important limitations and deployment cautions
+```mermaid
+flowchart LR
+    Dev[Developer push / PR] --> GitHub[GitHub Actions]
+    GitHub --> Validate[terraform fmt -check]
+    GitHub --> Init[terraform init]
+    GitHub --> Validate2[terraform validate]
+    GitHub --> OIDC[GitHub OIDC -> AWS IAM Role]
+    OIDC --> Apply[terraform apply]
+```
 
-- **Terraform state contains secrets:** Marking a variable `sensitive` hides it from normal Terraform output, but does not prevent the database password from being stored in Terraform state. Restrict access to the state bucket and its backups. The S3 backend enables encryption, but state access should still be treated as access to secrets.
-- **The database is a single instance.** A subnet group spans two AZs, but the RDS instance does not enable Multi-AZ deployment. This does not provide database failover across AZs.
-- **Two desired tasks do not guarantee one task per AZ.** The service uses both private subnets, but the configuration does not enforce an even placement across AZs.
-- **There is one NAT Gateway.** It is a single point of egress and may be a cross-AZ dependency for workloads in the other AZ. It is not a highly available NAT design.
-- **The ALB only serves HTTP.** No HTTPS listener or TLS certificate is configured.
-- **S3 versioning is not configured here.** Enable bucket versioning separately if state history and recovery are required.
-- **The application is only the stock Nginx image.** It does not deploy application code or connect the web container to the database.
+The deployment workflow uses GitHub OIDC instead of long-lived AWS access keys. This keeps credentials out of the repository and follows least-privilege access by using an IAM role with only the permissions required for Terraform.
+
+## Demo/project limitations
+
+This is not a production-grade application platform. The goal is to demonstrate infrastructure fundamentals clearly and honestly.
+
+- Single NAT Gateway is a demo design, not a highly available production pattern.
+- ALB is HTTP only; no TLS/HTTPS certificate is configured.
+- The application is the stock `nginx:alpine` image; it is not a full app with DB connectivity logic.
+- RDS is a single-instance PostgreSQL deployment.
+- There is no multi-AZ failover, no autoscaling, no Kubernetes, and no advanced networking hardening.
+- Terraform state must still be protected and access controlled.
 
 ## Repository layout
 
@@ -84,44 +99,60 @@ The ALB listener accepts HTTP on port 80 and forwards requests to the ECS servic
 ├── backend.tf
 ├── main.tf
 ├── variables.tf
-└── modules/
-    ├── vpc/
-    │   ├── main.tf
-    │   ├── outputs.tf
-    │   └── variables.tf
-    ├── ecs/
-    │   ├── main.tf
-    │   ├── outputs.tf
-    │   └── variables.tf
-    └── rds/
-        ├── main.tf
-        ├── outputs.tf
-        └── variables.tf
+├── modules/
+│   ├── vpc/
+│   │   ├── main.tf
+│   │   ├── outputs.tf
+│   │   └── variables.tf
+│   ├── ecs/
+│   │   ├── main.tf
+│   │   ├── outputs.tf
+│   │   └── variables.tf
+│   └── rds/
+│       ├── main.tf
+│       ├── outputs.tf
+│       └── variables.tf
+├── README.md
+└── .gitignore
 ```
 
 ## Requirements
 
-- Terraform version `1.5.0` or later.
+- Terraform `>= 1.5.0`
+- AWS account with permissions to create VPC, ECS, ALB, WAF, and RDS resources
+- S3 bucket and DynamoDB lock table for the remote backend
+- AWS Secrets Manager secret containing the PostgreSQL password
 
-The provider and workflow currently target `ap-south-1`. Update the provider/workflow configuration together if deploying in another region.
+## Local workflow
 
-## Run Terraform locally
-
-From the repository root:
-
-```sh
+```bash
 terraform init
-terraform fmt -check
+terraform fmt
 terraform validate
 terraform plan
-```
-
-Terraform uses your configured AWS credential provider. Set `TF_VAR_db_password` securely before planning or applying; avoid putting credentials or the password directly in commands that may be saved in shell history.
-
-Review the plan and make sure the backend, AWS account, region, and credentials are correct before deploying:
-
-```sh
 terraform apply
 ```
 
-The GitHub Actions workflow runs formatting, initialization, and validation for pull requests targeting `main`.
+For local runs, authenticate with AWS CLI or another AWS credential provider. Do not hardcode credentials in files or shell history.
+
+Set the variable `db_secret_id` to the ARN or name of your Secrets Manager secret before running Terraform:
+
+```bash
+export TF_VAR_db_secret_id="arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:your-db-password"
+```
+
+If using GitHub Actions, configure the AWS role ARN as a repository or environment secret and let the workflow assume that role with OIDC.
+
+## Manual configuration needed
+
+Before deploying, complete the following in AWS:
+
+1. Create an S3 bucket for the Terraform backend and a DynamoDB table for locking.
+2. Update `backend.tf` with your bucket name, region, and lock table.
+3. Create a secret in AWS Secrets Manager for the PostgreSQL password.
+4. Set the secret ID as `TF_VAR_db_secret_id` locally or as a GitHub secret in the workflow.
+5. Create an IAM role for GitHub OIDC and store the role ARN in a GitHub Action secret.
+
+## Security note
+
+This project keeps the password in AWS Secrets Manager instead of committing it to the repo, but Terraform state and provider metadata still require controlled access. Restrict S3 backend access, rotate secrets regularly, and avoid storing unneeded credentials in local files.

@@ -1,14 +1,13 @@
-# Database Firewall Rules
-resource "aws_security_group" "database_firewall_shield" {
-  name        = "${var.environment}-rds-postgres-sg"
-  description = "Restricts database port entry rules to verified inner container layers only"
+resource "aws_security_group" "database" {
+  name        = "${var.environment}-rds-sg"
+  description = "Allow PostgreSQL access only from the ECS task security group."
   vpc_id      = var.vpc_id
 
   ingress {
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
-    security_groups = [var.ecs_tasks_security_group_id] # Allow connections from resources using the ECS tasks security group.
+    security_groups = [var.ecs_tasks_security_group_id]
   }
 
   egress {
@@ -18,23 +17,25 @@ resource "aws_security_group" "database_firewall_shield" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "${var.environment}-database-security-group" }
+  tags = {
+    Name = "${var.environment}-rds-sg"
+  }
 }
 
-
-# Standard PostgreSQL Instance
-resource "aws_db_instance" "postgres_data_backbone" {
-  identifier             = "${var.environment}-enterprise-postgres-db"
+resource "aws_db_instance" "main" {
+  identifier             = "${var.environment}-postgres"
   engine                 = "postgres"
-  engine_version         = "15.19" 
+  engine_version         = "15.19"
   instance_class         = "db.t3.micro"
-  allocated_storage      = 20            
-  db_name                = "enterprise_app_db"
-  username               = "cloud_admin_root"
-  password               = var.db_password 
+  allocated_storage      = 20
+  db_name                = "appdb"
+  username               = "dbadmin"
+  password               = var.db_password
   db_subnet_group_name   = var.db_subnet_group_name
-  vpc_security_group_ids = [aws_security_group.database_firewall_shield.id]
+  vpc_security_group_ids = [aws_security_group.database.id]
   skip_final_snapshot    = true
 
-  tags = { Name = "${var.environment}-postgres-db-instance" }
+  tags = {
+    Name = "${var.environment}-postgres"
+  }
 }

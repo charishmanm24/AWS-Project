@@ -1,25 +1,25 @@
 variable "environment" {
   type        = string
-  description = "The target deployment lifecycle stage name tag"
+  description = "Deployment environment name used in resource tags."
 }
 
 variable "vpc_id" {
   type        = string
-  description = "The reference ID string of the custom network VPC"
+  description = "VPC ID for the database security group."
 }
 
 variable "db_subnet_group_name" {
   type        = string
-  description = "The registered database subnet group name tag token to mount our storage clusters"
+  description = "Subnet group used by the RDS instance."
 }
 
 variable "ecs_tasks_security_group_id" {
   type        = string
-  description = "The security group identifier of the application containers requesting data connectivity"
+  description = "Security group ID for the ECS tasks that are allowed to reach PostgreSQL."
 }
 
 variable "db_password" {
   type        = string
-  sensitive   = true # Redacts the value from normal Terraform output; it remains in state.
-  description = "The root master password for the PostgreSQL database instance"
+  sensitive   = true
+  description = "PostgreSQL password loaded from AWS Secrets Manager."
 }
