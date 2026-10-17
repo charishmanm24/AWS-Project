@@ -8,11 +8,13 @@ on:
     branches:
       - main
 
+# Grant only the permissions needed for checkout and GitHub OIDC authentication.
 permissions:
   id-token: write
   contents: read
 
 jobs:
+  # Validate pull requests without AWS credentials or access to the remote state.
   validate:
     name: Terraform validation
     if: github.event_name == 'pull_request'
@@ -36,6 +38,7 @@ jobs:
       - name: Terraform validate
         run: terraform validate
 
+  # Apply changes only after code is pushed to main, using the protected prod environment.
   deploy:
     name: Terraform deploy
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -58,8 +61,10 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
+          # This IAM role must trust this repository's GitHub OIDC identity.
           role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+          # Must match the audience configured on the AWS IAM OIDC provider.
           audience: sts.amazonaws.com
 
       - name: Terraform init
