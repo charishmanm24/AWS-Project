@@ -5,7 +5,7 @@ terraform {
     bucket         = "aws-tf-state-aps1" # Must match your exact S3 bucket name
     key            = "global/s3/terraform.tfstate"
     region         = "ap-south-1"
-    dynamodb_table = "terraform-state-locks"
+    dynamodb_table = "prod-terraform-locks"
     encrypt        = true
   }
 
