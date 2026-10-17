@@ -14,7 +14,6 @@ permissions:
   contents: read
 
 jobs:
-  # Validate pull requests without AWS credentials.
   validate:
     name: Terraform validation
     if: github.event_name == 'pull_request'
