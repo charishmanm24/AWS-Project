@@ -61,7 +61,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           # This IAM role must trust this repository's GitHub Action's OIDC identity.
-          role-to-assume: ${{ secrets.AWS_GITHUB_OIDC_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
           # Must match the audience configured on the AWS IAM OIDC provider.
           audience: sts.amazonaws.com
