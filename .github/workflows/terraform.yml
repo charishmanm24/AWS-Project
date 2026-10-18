@@ -37,7 +37,7 @@ jobs:
       - name: Terraform validate
         run: terraform validate
 
-  # Apply changes only after code is pushed to main, using the protected prod environment.
+  # Apply changes only after code is pushed to main, using the prod environment which is protected.
   deploy:
     name: Terraform deploy
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
