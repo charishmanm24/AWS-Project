@@ -2,6 +2,13 @@ data "aws_secretsmanager_secret_version" "db_password" {
   secret_id = var.db_secret_id
 }
 
+locals {
+  db_password = try(
+    jsondecode(data.aws_secretsmanager_secret_version.db_password.secret_string).password,
+    data.aws_secretsmanager_secret_version.db_password.secret_string
+  )
+}
+
 module "vpc" {
   source = "./modules/vpc"
 
@@ -27,7 +34,7 @@ module "rds" {
   vpc_id                      = module.vpc.vpc_id
   db_subnet_group_name        = module.vpc.db_subnet_group_name
   ecs_tasks_security_group_id = module.ecs.ecs_tasks_security_group_id
-  db_password                 = data.aws_secretsmanager_secret_version.db_password.secret_string
+  db_password                 = local.db_password
 }
 
 output "application_endpoint" {

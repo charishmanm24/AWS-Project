@@ -149,7 +149,7 @@ Before deploying, complete the following in AWS:
 
 1. Create an S3 bucket for the Terraform backend and a DynamoDB table for locking.
 2. Update `backend.tf` with your bucket name, region, and lock table.
-3. Create a secret in AWS Secrets Manager for the PostgreSQL password.
+3. Create a secret in AWS Secrets Manager for the PostgreSQL password. It can be plain text or JSON with a top-level `password` field. The password must be 8-128 characters, use printable ASCII characters, and exclude `/`, `"`, `@`, and spaces.
 4. Set the secret ID as `TF_VAR_db_secret_id` locally or as a GitHub secret in the workflow.
 5. Create an IAM role for GitHub OIDC and store the role ARN in a GitHub Action secret.
 
